@@ -16,6 +16,9 @@ redis[hiredis]==5.2.1
 pydantic==2.10.4
 pydantic-settings==2.7.1
 
+# Password / key hashing
+bcrypt==4.2.1
+
 # Structured logging
 structlog==24.4.0
 

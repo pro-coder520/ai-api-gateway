@@ -52,7 +52,7 @@ async def shutdown_db_engine() -> None:
         await logger.ainfo("Database engine disposed")
 
 
-async def get_db_session() -> AsyncSession:
+async def get_db_session():
     """FastAPI dependency that yields an async database session."""
     if _session_factory is None:
         raise RuntimeError(
@@ -60,7 +60,7 @@ async def get_db_session() -> AsyncSession:
         )
     async with _session_factory() as session:
         try:
-            yield session  # type: ignore[misc]
+            yield session
             await session.commit()
         except Exception:
             await session.rollback()
@@ -99,16 +99,25 @@ async def get_redis() -> aioredis.Redis:
     return _redis
 
 
-# ── Auth (placeholder — fully implemented in Step 3) ─────────────────────────
+# ── Auth ──────────────────────────────────────────────────────────────────────
 
 
 async def get_current_api_key(
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
-) -> str:
+    session: AsyncSession = Depends(get_db_session),
+    redis_client: aioredis.Redis = Depends(get_redis),
+) -> dict:
     """Extract and validate the API key from the Authorization header.
 
-    Placeholder implementation for Step 1 — returns a dummy key.
-    Full SHA-256 validation with Redis caching is added in Step 3.
+    Pipeline:
+    1. Extract Bearer token.
+    2. Hash with SHA-256.
+    3. Check Redis cache (5 min TTL).
+    4. Fallback to PostgreSQL on cache miss.
+    5. Return key metadata dict on success, 401 on failure.
+
+    Returns:
+        dict with key metadata: id, name, prefix, is_active, scopes, rate_limit.
     """
     if authorization is None:
         raise HTTPException(
@@ -133,11 +142,28 @@ async def get_current_api_key(
                 }
             },
         )
-    return token
+
+    from auth.service import validate_api_key
+
+    try:
+        key_data = await validate_api_key(token, session, redis_client)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": {
+                    "type": "auth_error",
+                    "message": str(exc),
+                    "code": "invalid_key",
+                }
+            },
+        )
+
+    return key_data
 
 
 # ── Typed dependency aliases ──────────────────────────────────────────────────
 
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 Redis = Annotated[aioredis.Redis, Depends(get_redis)]
-ApiKey = Annotated[str, Depends(get_current_api_key)]
+CurrentApiKey = Annotated[dict, Depends(get_current_api_key)]

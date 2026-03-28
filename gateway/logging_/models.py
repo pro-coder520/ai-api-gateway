@@ -3,6 +3,8 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Float, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column
+
 from auth.models import Base
 
 
@@ -13,11 +15,6 @@ class RequestLog(Base):
     """
 
     __tablename__ = "analytics_requestlog"
-
-    id: int = None  # type: ignore[assignment]
-    __table_args__ = {"extend_existing": True}
-
-    from sqlalchemy.orm import Mapped, mapped_column
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     key_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)

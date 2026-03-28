@@ -4,9 +4,9 @@ These tables are shared with the FastAPI gateway via the same PostgreSQL databas
 The gateway reads from them using SQLAlchemy; Django owns the schema and migrations.
 """
 
-import hashlib
 import secrets
 
+import bcrypt
 from django.db import models
 
 
@@ -18,7 +18,7 @@ class ApiKey(models.Model):
         max_length=8, db_index=True, help_text="First 8 chars for display."
     )
     hashed_key = models.CharField(
-        max_length=64, unique=True, db_index=True, help_text="SHA-256 hash of the key."
+        max_length=128, unique=True, db_index=True, help_text="Bcrypt hash of the key."
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -42,10 +42,12 @@ class ApiKey(models.Model):
         """Create a new API key, returning (instance, plaintext_key).
 
         The plaintext key is only available at creation time. It is
-        hashed with SHA-256 before storage.
+        hashed with bcrypt before storage.
         """
         raw_key = f"sk-{secrets.token_urlsafe(48)}"
-        hashed = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        hashed = bcrypt.hashpw(raw_key.encode("utf-8"), bcrypt.gensalt()).decode(
+            "utf-8"
+        )
         instance = cls(
             name=name,
             prefix=raw_key[:8],

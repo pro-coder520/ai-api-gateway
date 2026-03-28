@@ -7,6 +7,9 @@ gunicorn==23.0.0
 # Database
 psycopg2-binary==2.9.10
 
+# Password / key hashing
+bcrypt==4.2.1
+
 # Redis & Celery
 redis==5.2.1
 celery==5.4.0

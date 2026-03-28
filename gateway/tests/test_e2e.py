@@ -15,6 +15,7 @@ class TestEndToEnd:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
+        assert "providers" in data
 
     @pytest.mark.asyncio
     async def test_list_models(self, async_client: AsyncClient) -> None:
@@ -26,10 +27,10 @@ class TestEndToEnd:
         assert len(data["data"]) > 0
 
     @pytest.mark.asyncio
-    async def test_chat_completions_placeholder(
+    async def test_chat_completions_missing_auth(
         self, async_client: AsyncClient
     ) -> None:
-        """POST /v1/chat/completions returns 501 until providers are wired."""
+        """POST /v1/chat/completions without auth returns 401."""
         response = await async_client.post(
             "/v1/chat/completions",
             json={
@@ -37,5 +38,23 @@ class TestEndToEnd:
                 "messages": [{"role": "user", "content": "Hello"}],
             },
         )
-        # Returns 501 in the skeleton (provider proxy wired in Step 4)
-        assert response.status_code == 501
+        assert response.status_code == 401
+        data = response.json()
+        assert data["detail"]["error"]["code"] == "missing_auth"
+
+    @pytest.mark.asyncio
+    async def test_chat_completions_invalid_auth_scheme(
+        self, async_client: AsyncClient
+    ) -> None:
+        """POST /v1/chat/completions with wrong auth scheme returns 401."""
+        response = await async_client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "gpt-4",
+                "messages": [{"role": "user", "content": "Hello"}],
+            },
+            headers={"Authorization": "Basic invalid-key"},
+        )
+        assert response.status_code == 401
+        data = response.json()
+        assert data["detail"]["error"]["code"] == "invalid_auth"

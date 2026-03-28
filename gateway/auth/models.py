@@ -19,7 +19,7 @@ class ApiKey(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     prefix: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
     hashed_key: Mapped[str] = mapped_column(
-        String(64), nullable=False, unique=True, index=True
+        String(128), nullable=False, unique=True, index=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
