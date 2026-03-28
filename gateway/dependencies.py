@@ -52,6 +52,15 @@ async def shutdown_db_engine() -> None:
         await logger.ainfo("Database engine disposed")
 
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Return the shared async session factory for fire-and-forget tasks."""
+    if _session_factory is None:
+        raise RuntimeError(
+            "Database engine not initialised. Call init_db_engine() first."
+        )
+    return _session_factory
+
+
 async def get_db_session():
     """FastAPI dependency that yields an async database session."""
     if _session_factory is None:

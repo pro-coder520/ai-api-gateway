@@ -22,7 +22,7 @@ from starlette.responses import StreamingResponse
 
 from cache.service import CacheService, generate_cache_key
 from config import settings
-from dependencies import CurrentApiKey, DbSession, Redis, get_db_session, get_redis
+from dependencies import CurrentApiKey, DbSession, Redis, get_db_session, get_redis, get_session_factory
 from logging_.service import log_request
 from providers.anthropic import AnthropicProvider
 from providers.base import BaseProvider
@@ -183,7 +183,7 @@ async def chat_completions(
             cache_hit = True
             latency_ms = (time.time() - start_time) * 1000
             log_request(
-                session_factory=None,
+                session_factory=get_session_factory(),
                 key_id=api_key.get("id"),
                 model=chat_request.model,
                 provider="cache",

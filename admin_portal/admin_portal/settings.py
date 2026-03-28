@@ -29,6 +29,8 @@ INSTALLED_APPS = [
     # Third-party
     "rest_framework",
     "corsheaders",
+    "django_celery_beat",
+    "django_celery_results",
     # Local apps
     "keys.apps.KeysConfig",
     "analytics.apps.AnalyticsConfig",
@@ -106,11 +108,19 @@ CORS_ALLOWED_ORIGINS = (
 
 # ── Celery ───────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/2")
-CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_RESULT_BACKEND = "django-db"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULE = {
+    "aggregate-daily-billing": {
+        "task": "analytics.tasks.aggregate_daily_billing",
+        # Run at 01:00 UTC every day
+        "schedule": 86400,  # seconds; celery beat cron via DB scheduler in admin
+    },
+}
 
 # ── Redis cache ──────────────────────────────────────────────────────────────
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/1")

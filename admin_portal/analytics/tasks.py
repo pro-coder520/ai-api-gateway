@@ -6,12 +6,14 @@ Runs as periodic tasks to aggregate request_logs into billing_records.
 import structlog
 from datetime import timedelta
 
+from celery import shared_task
 from django.db.models import Avg, Count, Sum
 from django.utils import timezone
 
 logger = structlog.get_logger(__name__)
 
 
+@shared_task(name="analytics.tasks.aggregate_daily_billing")
 def aggregate_daily_billing() -> None:
     """Aggregate yesterday's request logs into daily billing records.
 
