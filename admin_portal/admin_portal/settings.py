@@ -98,6 +98,13 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAdminUser",
+    ],
 }
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
@@ -114,11 +121,12 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+from celery.schedules import crontab
+
 CELERY_BEAT_SCHEDULE = {
     "aggregate-daily-billing": {
         "task": "analytics.tasks.aggregate_daily_billing",
-        # Run at 01:00 UTC every day
-        "schedule": 86400,  # seconds; celery beat cron via DB scheduler in admin
+        "schedule": crontab(hour=1, minute=0),  # Run at 01:00 UTC every day
     },
 }
 
