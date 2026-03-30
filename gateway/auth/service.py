@@ -11,6 +11,7 @@ Pipeline:
 5. Return 401 for invalid, inactive, or expired keys.
 """
 
+import hashlib
 import json
 from datetime import datetime, timezone
 
@@ -79,7 +80,8 @@ async def validate_api_key(
         ValueError: If the key is invalid, inactive, or expired.
     """
     prefix = get_key_prefix(raw_key)
-    cache_key = f"{CACHE_KEY_PREFIX}{prefix}:{raw_key[-8:]}"
+    key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:16]
+    cache_key = f"{CACHE_KEY_PREFIX}{prefix}:{key_hash}"
 
     # ── Redis cache lookup ────────────────────────────────────────────
     cached = await redis_client.get(cache_key)
