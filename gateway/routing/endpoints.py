@@ -241,10 +241,33 @@ async def chat_completions(
         try:
             stream_iter = provider.stream(chat_request)
             sse_handler = SSEHandler()
+
+            async def _on_stream_complete(total_tokens: int) -> None:
+                """Called after the stream finishes successfully."""
+                await cb.record_success()
+                latency_ms = (time.time() - start_time) * 1000
+                log_request(
+                    session_factory=get_session_factory(),
+                    key_id=api_key.get("id"),
+                    model=chat_request.model,
+                    provider=slug,
+                    input_tokens=0,
+                    output_tokens=total_tokens,
+                    latency_ms=latency_ms,
+                    status_code=200,
+                    cached=False,
+                )
+
+            async def _on_stream_error(exc: Exception) -> None:
+                """Called when the stream encounters an error."""
+                await cb.record_failure()
+
             streaming_response = await sse_handler.stream_response(
-                stream_iter, chat_request.model
+                stream_iter,
+                chat_request.model,
+                on_complete=_on_stream_complete,
+                on_error=_on_stream_error,
             )
-            await cb.record_success()
             for k, v in rate_limit_headers.items():
                 streaming_response.headers[k] = v
             streaming_response.headers["X-Cache"] = "MISS"
@@ -259,7 +282,7 @@ async def chat_completions(
                 content=ErrorResponse(
                     error=ErrorDetail(
                         type="upstream_error",
-                        message=f"Provider error: {exc}",
+                        message="An error occurred while streaming from the upstream provider. Please try again later.",
                         code="stream_failed",
                     )
                 ).model_dump(),
@@ -287,7 +310,7 @@ async def chat_completions(
             content=ErrorResponse(
                 error=ErrorDetail(
                     type="upstream_error",
-                    message=f"Provider error: {exc}",
+                    message="An error occurred while processing your request with the upstream provider. Please try again later.",
                     code="provider_failed",
                 )
             ).model_dump(),
@@ -310,7 +333,7 @@ async def chat_completions(
 
     # ── Async logging ─────────────────────────────────────────────────
     log_request(
-        session_factory=None,
+        session_factory=get_session_factory(),
         key_id=api_key.get("id"),
         model=chat_request.model,
         provider=slug,
