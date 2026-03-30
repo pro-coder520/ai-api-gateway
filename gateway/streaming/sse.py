@@ -25,17 +25,23 @@ class SSEHandler:
     def __init__(self) -> None:
         self.total_tokens: int = 0
         self._cancelled: bool = False
+        self._error: Exception | None = None
+        self._completed: bool = False
 
     async def stream_response(
         self,
         upstream_stream: AsyncIterator[str],
         model: str,
+        on_complete: Any = None,
+        on_error: Any = None,
     ) -> StreamingResponse:
         """Wrap an upstream SSE stream for the client.
 
         Args:
             upstream_stream: The async iterator of SSE chunks from the provider.
             model: The model name for logging.
+            on_complete: Optional async callback(total_tokens) called on successful completion.
+            on_error: Optional async callback(exception) called on stream error.
 
         Returns:
             A Starlette StreamingResponse with media_type text/event-stream.
@@ -48,14 +54,22 @@ class SSEHandler:
                         break
                     self._count_tokens(chunk)
                     yield chunk
+                self._completed = True
             except asyncio.CancelledError:
                 await logger.ainfo("stream_cancelled", model=model)
+            except Exception as exc:
+                self._error = exc
+                await logger.aerror("stream_error_during_iteration", model=model, error=str(exc))
             finally:
                 await logger.ainfo(
                     "stream_complete",
                     model=model,
                     total_tokens=self.total_tokens,
                 )
+                if self._error and on_error:
+                    await on_error(self._error)
+                elif self._completed and on_complete:
+                    await on_complete(self.total_tokens)
 
         return StreamingResponse(
             _generate(),
