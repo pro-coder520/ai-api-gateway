@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from dependencies import init_db_engine, shutdown_db_engine, init_redis, shutdown_redis
-from routing.endpoints import router as api_router
+from routing.endpoints import close_providers, router as api_router
 
 logger = structlog.get_logger(__name__)
 
@@ -47,6 +47,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     yield
 
     await log.ainfo("Shutting down AI API Gateway")
+    await close_providers()
     await shutdown_redis()
     await shutdown_db_engine()
 
@@ -62,10 +63,11 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
+    cors_origins = settings.cors_allowed_origins.split(",") if settings.cors_allowed_origins else []
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=cors_origins if cors_origins else ["*"],
+        allow_credentials=bool(cors_origins),
         allow_methods=["*"],
         allow_headers=["*"],
     )

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     gateway_secret_key: str = "change-me"
     gateway_debug: bool = False
     gateway_log_level: str = "INFO"
+    cors_allowed_origins: str = ""  # Comma-separated origins; empty = allow all (dev only)
 
     # ── Database ──────────────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://gateway:gateway_secret@localhost:5432/ai_gateway"
