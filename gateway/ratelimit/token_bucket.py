@@ -8,6 +8,7 @@ configurable capacity and refill rate.
 import time
 
 import redis.asyncio as aioredis
+from redis.exceptions import NoScriptError
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -62,6 +63,12 @@ class TokenBucket:
         if self._check_sha is None:
             self._check_sha = await self.redis.script_load(CHECK_TOKENS_SCRIPT)  # type: ignore[assignment]
 
+    async def _reload_scripts(self) -> None:
+        """Force re-register Lua scripts (called after NOSCRIPT errors)."""
+        self._consume_sha = None
+        self._check_sha = None
+        await self._ensure_scripts()
+
     async def consume(
         self,
         key_id: str,
@@ -81,14 +88,25 @@ class TokenBucket:
         await self._ensure_scripts()
         bucket_key = f"ratelimit:{key_id}"
         now = time.time()
-        result = await self.redis.evalsha(
-            self._consume_sha,  # type: ignore[arg-type]
-            1,
-            bucket_key,
-            str(capacity),
-            str(refill_rate),
-            str(now),
-        )
+        try:
+            result = await self.redis.evalsha(
+                self._consume_sha,  # type: ignore[arg-type]
+                1,
+                bucket_key,
+                str(capacity),
+                str(refill_rate),
+                str(now),
+            )
+        except NoScriptError:
+            await self._reload_scripts()
+            result = await self.redis.evalsha(
+                self._consume_sha,  # type: ignore[arg-type]
+                1,
+                bucket_key,
+                str(capacity),
+                str(refill_rate),
+                str(now),
+            )
         allowed = int(result) == 1
         if not allowed:
             await logger.awarn("rate_limited", key_id=key_id)
@@ -113,14 +131,25 @@ class TokenBucket:
         await self._ensure_scripts()
         bucket_key = f"ratelimit:{key_id}"
         now = time.time()
-        result = await self.redis.evalsha(
-            self._check_sha,  # type: ignore[arg-type]
-            1,
-            bucket_key,
-            str(capacity),
-            str(refill_rate),
-            str(now),
-        )
+        try:
+            result = await self.redis.evalsha(
+                self._check_sha,  # type: ignore[arg-type]
+                1,
+                bucket_key,
+                str(capacity),
+                str(refill_rate),
+                str(now),
+            )
+        except NoScriptError:
+            await self._reload_scripts()
+            result = await self.redis.evalsha(
+                self._check_sha,  # type: ignore[arg-type]
+                1,
+                bucket_key,
+                str(capacity),
+                str(refill_rate),
+                str(now),
+            )
         return float(result)
 
     async def increment_daily_usage(self, key_id: str, tokens: int) -> int:
