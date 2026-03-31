@@ -18,6 +18,8 @@ import django
 
 django.setup()
 
+from django.db import transaction
+
 from keys.models import ApiKey, RateLimitPolicy
 
 
@@ -44,15 +46,16 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    api_key, raw_key = ApiKey.generate(name=args.name, scopes=args.scopes)
-    api_key.save()
+    with transaction.atomic():
+        api_key, raw_key = ApiKey.generate(name=args.name, scopes=args.scopes)
+        api_key.save()
 
-    RateLimitPolicy.objects.create(
-        api_key=api_key,
-        capacity=args.capacity,
-        refill_rate=args.refill_rate,
-        daily_token_limit=args.daily_limit,
-    )
+        RateLimitPolicy.objects.create(
+            api_key=api_key,
+            capacity=args.capacity,
+            refill_rate=args.refill_rate,
+            daily_token_limit=args.daily_limit,
+        )
 
     print("\n" + "=" * 60)
     print("  API Key Generated Successfully")
