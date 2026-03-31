@@ -116,3 +116,7 @@ class OpenAIProvider(BaseProvider):
             "gpt-4o",
             "gpt-3.5-turbo",
         ]
+
+    async def close(self) -> None:
+        """Close the httpx client."""
+        await self._client.aclose()

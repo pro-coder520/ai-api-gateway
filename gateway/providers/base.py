@@ -33,3 +33,6 @@ class BaseProvider(ABC):
     def supported_models(self) -> list[str]:
         """Return a list of model identifiers this provider supports."""
         ...
+
+    async def close(self) -> None:
+        """Close any underlying HTTP clients. Override in subclasses."""

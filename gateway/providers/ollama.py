@@ -99,3 +99,7 @@ class OllamaProvider(BaseProvider):
     def supported_models(self) -> list[str]:
         """Return a default list; dynamically fetched in Step 5."""
         return ["llama3", "mistral", "codellama"]
+
+    async def close(self) -> None:
+        """Close the httpx client."""
+        await self._client.aclose()
