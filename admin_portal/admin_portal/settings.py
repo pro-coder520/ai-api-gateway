@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY", "django-insecure-change-me-in-production"
 )
-DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() == "true"
+DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS = os.environ.get(
     "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,admin"
 ).split(",")
