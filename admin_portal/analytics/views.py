@@ -43,12 +43,21 @@ class RequestLogListView(generics.ListAPIView):
         return qs
 
 
+def _parse_days(raw: str | None, default: int) -> int:
+    """Parse and clamp the 'days' query parameter."""
+    try:
+        days = int(raw) if raw else default
+    except (ValueError, TypeError):
+        days = default
+    return max(1, min(days, 365))
+
+
 class UsageSummaryView(APIView):
     """Aggregated usage statistics with date-range filtering."""
 
     def get(self, request) -> Response:  # type: ignore[no-untyped-def]
         """Return aggregated usage stats for the given period."""
-        days = int(request.query_params.get("days", 7))
+        days = _parse_days(request.query_params.get("days"), 7)
         since = timezone.now() - timedelta(days=days)
         qs = RequestLog.objects.filter(timestamp__gte=since)
 
@@ -78,7 +87,7 @@ class CostByModelView(APIView):
 
     def get(self, request) -> Response:  # type: ignore[no-untyped-def]
         """Return cost aggregated by model name."""
-        days = int(request.query_params.get("days", 7))
+        days = _parse_days(request.query_params.get("days"), 7)
         since = timezone.now() - timedelta(days=days)
         breakdown = (
             RequestLog.objects.filter(timestamp__gte=since)
@@ -98,7 +107,7 @@ class CostByKeyView(APIView):
 
     def get(self, request) -> Response:  # type: ignore[no-untyped-def]
         """Return cost aggregated by API key ID."""
-        days = int(request.query_params.get("days", 7))
+        days = _parse_days(request.query_params.get("days"), 7)
         since = timezone.now() - timedelta(days=days)
         breakdown = (
             RequestLog.objects.filter(timestamp__gte=since)

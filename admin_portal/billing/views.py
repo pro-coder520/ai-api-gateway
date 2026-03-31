@@ -37,7 +37,11 @@ class BillingSummaryView(APIView):
 
     def get(self, request) -> Response:  # type: ignore[no-untyped-def]
         """Return total cost and token usage for the period."""
-        days = int(request.query_params.get("days", 30))
+        try:
+            days = int(request.query_params.get("days", 30))
+        except (ValueError, TypeError):
+            days = 30
+        days = max(1, min(days, 365))
         since = timezone.now().date() - timedelta(days=days)
         qs = BillingRecord.objects.filter(date__gte=since)
 
