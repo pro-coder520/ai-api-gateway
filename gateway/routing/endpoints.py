@@ -59,6 +59,13 @@ def _get_provider(slug: str) -> BaseProvider:
     return _providers[slug]
 
 
+async def close_providers() -> None:
+    """Close all provider httpx clients. Called during shutdown."""
+    for provider in _providers.values():
+        await provider.close()
+    _providers.clear()
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 
@@ -147,6 +154,9 @@ async def chat_completions(
     # ── Rate limit check ──────────────────────────────────────────────
     rate_limit_headers = await check_rate_limit(api_key, redis_client)
 
+    # ── Pre-flight daily token limit check ────────────────────────────
+    await check_daily_limit(api_key, redis_client, tokens_used=0)
+
     # ── Check model scopes ────────────────────────────────────────────
     if api_key.get("scopes"):
         allowed_prefixes = [s.strip() for s in api_key["scopes"].split(",")]
@@ -207,9 +217,16 @@ async def chat_completions(
     # ── Circuit breaker check ─────────────────────────────────────────
     cb = CircuitBreaker(redis_client, slug)
     if not await cb.is_request_allowed():
+        # Only failover to providers that support the requested model
         fallback_slugs = [s for s in ("openai", "anthropic", "ollama") if s != slug]
         fallback_found = False
         for fb_slug in fallback_slugs:
+            try:
+                fb_provider = _get_provider(fb_slug)
+                if chat_request.model not in fb_provider.supported_models():
+                    continue
+            except ValueError:
+                continue
             fb_cb = CircuitBreaker(redis_client, fb_slug)
             if await fb_cb.is_request_allowed():
                 await logger.awarn(
@@ -246,6 +263,12 @@ async def chat_completions(
                 """Called after the stream finishes successfully."""
                 await cb.record_success()
                 latency_ms = (time.time() - start_time) * 1000
+                # Track daily token usage for streaming responses
+                if total_tokens > 0:
+                    try:
+                        await check_daily_limit(api_key, redis_client, total_tokens)
+                    except Exception:
+                        pass  # Don't fail the stream; limit enforced on next request
                 log_request(
                     session_factory=get_session_factory(),
                     key_id=api_key.get("id"),
@@ -326,10 +349,13 @@ async def chat_completions(
     if cache_key is not None:
         await cache_service.set(cache_key, response_dict)
 
-    # ── Daily token tracking ──────────────────────────────────────────
+    # ── Daily token tracking (record usage; limit enforced pre-flight) ─
     total_tokens = response_data.usage.total_tokens
     if total_tokens > 0:
-        await check_daily_limit(api_key, redis_client, total_tokens)
+        try:
+            await check_daily_limit(api_key, redis_client, total_tokens)
+        except Exception:
+            pass  # Tokens already consumed; limit enforced on next request
 
     # ── Async logging ─────────────────────────────────────────────────
     log_request(

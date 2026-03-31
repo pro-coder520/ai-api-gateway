@@ -83,10 +83,13 @@ async def check_daily_limit(
 ) -> None:
     """Check and update daily token usage.
 
+    When called with tokens_used=0, acts as a pre-flight check (no increment).
+    When called with tokens_used>0, increments the counter and checks.
+
     Args:
         key_data: The authenticated API key metadata dict.
         redis_client: The async Redis client.
-        tokens_used: Number of tokens consumed by this request.
+        tokens_used: Number of tokens consumed by this request (0 for pre-flight).
 
     Raises:
         HTTPException: 429 if the daily token limit is exceeded.
@@ -100,7 +103,11 @@ async def check_daily_limit(
 
     key_id = str(key_data["id"])
     bucket = TokenBucket(redis_client)
-    new_total = await bucket.increment_daily_usage(key_id, tokens_used)
+
+    if tokens_used > 0:
+        new_total = await bucket.increment_daily_usage(key_id, tokens_used)
+    else:
+        new_total = await bucket.get_daily_usage(key_id)
 
     if new_total > daily_limit:
         await logger.awarn(
