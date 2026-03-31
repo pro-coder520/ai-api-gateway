@@ -11,6 +11,7 @@ Pipeline:
 5. Return 401 for invalid, inactive, or expired keys.
 """
 
+import asyncio
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -104,7 +105,10 @@ async def validate_api_key(
 
     api_key: ApiKey | None = None
     for candidate in candidates:
-        if verify_api_key(raw_key, candidate.hashed_key):
+        matched = await asyncio.to_thread(
+            verify_api_key, raw_key, candidate.hashed_key
+        )
+        if matched:
             api_key = candidate
             break
 
@@ -144,8 +148,7 @@ async def validate_api_key(
     await redis_client.setex(cache_key, CACHE_TTL_SECONDS, json.dumps(key_data))
     await logger.adebug("auth_cache_set", key_id=api_key.id)
 
-    # Update last_used_at
+    # Update last_used_at (committed by the session dependency on exit)
     api_key.last_used_at = datetime.now(timezone.utc)
-    await session.commit()
 
     return key_data
