@@ -53,3 +53,5 @@ desktop.ini
 # ── Misc ──────────────────────────────────────
 *.log
 *.bak
+".env" 
+".env.example" 
