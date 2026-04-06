@@ -33,8 +33,6 @@ graph TB
 ```bash
 git clone <your-repo-url>
 cd ai-api-gateway
-cp .env.example .env
-# Edit .env with your API keys
 ```
 
 ### 2. Start all services
